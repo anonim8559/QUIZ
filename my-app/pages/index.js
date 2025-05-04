@@ -11,7 +11,7 @@ export default function Home() {
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [quizFinished, setQuizFinished] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
-  const [quizStarted, setQuizStarted] = useState(false); // Nowy stan, który wskazuje, czy quiz został rozpoczęty.
+  const [quizStarted, setQuizStarted] = useState(false);
 
   const totalQuestions = 10;
 
@@ -35,7 +35,7 @@ export default function Home() {
       setQuestionData(data);
       setQuestionNumber((prev) => prev + 1);
     } catch (error) {
-      console.error("Błąd pobierania pytania:", error);
+      console.error("Error fetching question:", error);
     } finally {
       setLoading(false);
     }
@@ -80,13 +80,13 @@ export default function Home() {
         {loading ? (
           <div style={styles.loaderContainer}>
             <div className="spinner" />
-            <p>Generowanie pytania...</p>
+            <p>Generating question...</p>
           </div>
         ) : quizFinished ? (
           <>
-            <h2 style={styles.question}>Koniec quizu!</h2>
-            <p style={{ fontSize: "1.2rem", color: "gray" }}>
-              Poprawne odpowiedzi: {correctAnswers} / {totalQuestions}
+            <h2 style={styles.question}>Quiz Completed!</h2>
+            <p style={{ fontSize: "1.2rem", color: "#333" }}>
+              Correct answers: {correctAnswers} / {totalQuestions}
             </p>
           </>
         ) : !questionData ? (
@@ -97,11 +97,11 @@ export default function Home() {
               fetchQuestion();
             }}
           >
-            Rozpocznij quiz
+            Start quiz
           </button>
         ) : (
           <>
-            {/* Pasek czasu */}
+            {/* Time progress bar */}
             {quizStarted && (
               <div style={styles.progressWrapper}>
                 <div
@@ -112,7 +112,7 @@ export default function Home() {
                   }}
                 />
                 <span style={styles.progressText}>
-                  {timeLeft > 0 ? `${timeLeft} sekund` : "⏰ Czas minął!"}
+                  {timeLeft > 0 ? `${timeLeft} seconds` : "⏰ Time's up!"}
                 </span>
               </div>
             )}
@@ -137,13 +137,13 @@ export default function Home() {
             </div>
             {showNext && (
               <button style={styles.button} onClick={fetchQuestion}>
-                Dalej
+                Next
               </button>
             )}
           </>
         )}
 
-        {/* Pasek z licznikiem pytań (na dole) - tylko po wygenerowaniu pytania */}
+        {/* Question counter progress bar (bottom) - only after question is generated */}
         {quizStarted && !loading && !quizFinished && (
           <div style={styles.questionCounterWrapper}>
             <div
@@ -154,7 +154,7 @@ export default function Home() {
               }}
             />
             <span style={styles.questionCounterText}>
-              Pytanie {questionNumber} z {totalQuestions}
+              Question {questionNumber} of {totalQuestions}
             </span>
           </div>
         )}
@@ -185,41 +185,44 @@ export default function Home() {
 const styles = {
   container: {
     minHeight: "100vh",
-    backgroundColor: "#eef2f7",
+    backgroundColor: "#f5f7fa",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     padding: "2rem",
+    fontFamily: "'Roboto', sans-serif",
   },
   card: {
-    background: "white",
+    background: "linear-gradient(135deg, #ffffff, #e6e6f1)",
     padding: "2rem",
     borderRadius: "20px",
-    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.1)",
+    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)",
     maxWidth: "700px",
     width: "100%",
     textAlign: "center",
+    boxSizing: "border-box",
   },
   loaderContainer: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     fontSize: "1.2rem",
-    color: "#555",
+    color: "#333",
   },
   question: {
     marginBottom: "2rem",
-    fontSize: "1.6rem",
+    fontSize: "1.8rem",
     fontWeight: "600",
     color: "#333",
+    lineHeight: "1.4",
   },
   progressWrapper: {
     position: "relative",
     height: "30px",
     backgroundColor: "#e0e0e0",
-    borderRadius: "15px",
+    borderRadius: "20px",
     overflow: "hidden",
-    marginBottom: "1.5rem",
+    marginBottom: "2rem",
   },
   progressBar: {
     position: "absolute",
@@ -228,7 +231,7 @@ const styles = {
     left: 0,
     transition: "width 0.5s ease",
     zIndex: 1,
-    borderRadius: "15px",
+    borderRadius: "20px",
   },
   progressText: {
     position: "relative",
@@ -238,23 +241,25 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     fontWeight: "600",
+    fontSize: "1.2rem",
     color: "#fff",
   },
   answersWrapper: {
     display: "flex",
     flexDirection: "column",
-    gap: "1rem",
+    gap: "1.5rem",
     marginBottom: "2rem",
     color: "gray",
   },
   answer: {
     padding: "1rem",
     border: "2px solid #ccc",
-    borderRadius: "12px",
+    borderRadius: "15px",
     cursor: "pointer",
-    fontSize: "1.1rem",
+    fontSize: "1.2rem",
     backgroundColor: "#fafafa",
     transition: "all 0.3s",
+    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)",
   },
   correct: {
     backgroundColor: "#d4edda",
@@ -271,10 +276,12 @@ const styles = {
     fontSize: "1.2rem",
     cursor: "pointer",
     border: "none",
-    borderRadius: "12px",
+    borderRadius: "20px",
     backgroundColor: "#007bff",
     color: "white",
     transition: "background 0.3s",
+    marginTop: "1rem",
+    boxShadow: "0 5px 15px rgba(0, 0, 0, 0.1)",
   },
   questionCounterWrapper: {
     marginTop: "1rem",
@@ -283,6 +290,7 @@ const styles = {
     borderRadius: "15px",
     position: "relative",
     marginBottom: "1.5rem",
+    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)",
   },
   questionCounterText: {
     position: "absolute",
@@ -290,9 +298,9 @@ const styles = {
     left: "50%",
     transform: "translateX(-50%)",
     lineHeight: "30px",
-    fontSize: "1.1rem",
+    fontSize: "1.2rem",
     fontWeight: "500",
-    color: "#333",
+    color: "#fff",
     zIndex: 2,
   },
 };
