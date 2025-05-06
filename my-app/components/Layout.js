@@ -20,14 +20,16 @@ export default function Layout({ children }) {
   return (
     <div style={styles.wrapper}>
       <nav style={styles.navbar}>
-        <div style={styles.logo}>🧠 EduQuiz</div>
+        <div style={styles.logo} onClick={() => router.push("/")}>
+          🧠 EduQuiz
+        </div>
         <div style={styles.navItems}>
-          <Link href="/" style={styles.navLink}>
-            Home
-          </Link>
           {user ? (
             <>
-              <Link href="/protected" style={styles.navLink}>
+              <Link href="/protected" style={styles.dashboardLink}>
+                <span role="img" aria-label="dashboard">
+                  📊
+                </span>{" "}
                 Dashboard
               </Link>
               <button onClick={handleLogout} style={styles.logoutButton}>
@@ -35,9 +37,12 @@ export default function Layout({ children }) {
               </button>
             </>
           ) : (
-            <Link href="/login" style={styles.navLink}>
+            <button
+              onClick={() => router.push("/login")}
+              style={styles.loginButton}
+            >
               Login
-            </Link>
+            </button>
           )}
         </div>
       </nav>
@@ -49,42 +54,72 @@ export default function Layout({ children }) {
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    backgroundColor: "#f4f6fa",
-    fontFamily: "'Segoe UI', sans-serif",
+    backgroundColor: "#eef2f7",
+    fontFamily: "'Roboto', sans-serif",
   },
   navbar: {
-    backgroundColor: "#1f2937",
-    color: "#ffffff",
+    background: "linear-gradient(135deg, #ffffff, #e6e6f1)",
+    color: "#333",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     padding: "1rem 2rem",
-    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.15)",
+    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.1)",
+    borderRadius: "0 0 20px 20px",
   },
   logo: {
-    fontSize: "1.4rem",
-    fontWeight: "bold",
+    fontSize: "1.6rem",
+    fontWeight: "700",
+    color: "#333",
+    letterSpacing: "1px",
+    cursor: "pointer",
   },
   navItems: {
     display: "flex",
     alignItems: "center",
-    gap: "1.2rem",
+    gap: "1.5rem",
   },
   navLink: {
-    color: "#ffffff",
+    color: "#333",
     textDecoration: "none",
-    fontSize: "1rem",
-    transition: "color 0.2s",
+    fontSize: "1.1rem",
+    fontWeight: "500",
+    transition: "color 0.3s",
   },
-  logoutButton: {
-    backgroundColor: "#ef4444",
+  loginButton: {
+    backgroundColor: "#34d399",
     border: "none",
     color: "#ffffff",
-    padding: "0.5rem 1rem",
-    borderRadius: "8px",
+    padding: "0.6rem 1.2rem",
+    borderRadius: "20px",
     cursor: "pointer",
-    fontSize: "0.95rem",
-    transition: "background 0.3s",
+    fontSize: "1rem",
+    fontWeight: "500",
+    transition: "background-color 0.3s",
+  },
+  logoutButton: {
+    backgroundColor: "#ff4d4d",
+    border: "none",
+    color: "#ffffff",
+    padding: "0.6rem 1.2rem",
+    borderRadius: "20px",
+    cursor: "pointer",
+    fontSize: "1rem",
+    fontWeight: "500",
+    transition: "background-color 0.3s",
+  },
+  dashboardLink: {
+    color: "#333",
+    fontSize: "1.8rem",
+    fontWeight: "600",
+    textDecoration: "none",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    padding: "0.3rem 0.5rem",
+    borderRadius: "12px",
   },
   content: {
     padding: "2rem",

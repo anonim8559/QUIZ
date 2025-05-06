@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import pb from "../lib/pocketbase";
+import { color } from "framer-motion";
 
 export default function Home() {
   const router = useRouter();
@@ -106,22 +107,46 @@ export default function Home() {
 
   const questionProgress = (questionNumber / totalQuestions) * 100;
 
-  // Dodanie logiki do przekierowania, jeśli użytkownik nie jest zalogowany
   const handleStartQuiz = () => {
     if (!pb.authStore.isValid) {
-      setShowLoginAlert(true); // Pokazujemy alert przed przekierowaniem
+      setShowLoginAlert(true); // pokazuje komunikat
       setTimeout(() => {
-        router.push("/login"); // Po 2 sekundach przekierowanie
+        router.push("/login"); // przekierowanie po 2s
       }, 2000);
     } else {
       setQuizStarted(true);
-      fetchQuestion(); // Jeśli użytkownik jest zalogowany, rozpocznij quiz
+      fetchQuestion(); // rozpoczęcie quizu
     }
   };
 
   return (
     <main style={styles.container}>
       <div style={styles.card}>
+        {showLoginAlert && (
+          <div style={styles.card}>
+            <h2
+              style={{
+                ...styles.title,
+                color: "black",
+                fontSize: "1.6rem",
+                fontWeight: "700",
+              }}
+            >
+              🔒 Please log in to start the quiz
+            </h2>
+            <p
+              style={{
+                ...styles.info,
+                color: "gray",
+                fontSize: "1.15rem",
+                fontWeight: "500",
+              }}
+            >
+              Redirecting to login page...
+            </p>
+          </div>
+        )}
+
         {loading ? (
           <div style={styles.loaderContainer}>
             <div className="spinner" />
@@ -198,13 +223,6 @@ export default function Home() {
           </div>
         )}
       </div>
-
-      {/* Login alert message */}
-      {showLoginAlert && (
-        <div style={styles.alert}>
-          <p style={styles.alertText}>You need to log in to start the quiz!</p>
-        </div>
-      )}
 
       {/* Spinner animation */}
       <style jsx>{`

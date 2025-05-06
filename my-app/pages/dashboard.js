@@ -7,6 +7,7 @@ export default function ProtectedPage() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -34,7 +35,7 @@ export default function ProtectedPage() {
           setResults(res || []);
         } catch (err) {
           console.warn("No results found or query failed:", err);
-          setResults([]); // zamiast rzucenia wyjątku, zwracamy pustą listę
+          setResults([]);
         }
       }
 
@@ -55,14 +56,23 @@ export default function ProtectedPage() {
   }
 
   if (!pb.authStore.isValid) {
-    router.push("/login");
-    return null;
+    setTimeout(() => {
+      router.push("/login");
+    }, 2000);
+    return (
+      <main style={styles.container}>
+        <div style={styles.card}>
+          <h2 style={styles.title}>🔒 Please log in to access the dashboard</h2>
+          <p style={styles.info}>Redirecting to login page...</p>
+        </div>
+      </main>
+    );
   }
 
   return (
     <main style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>Your Quiz Results</h2>
+        <h2 style={styles.title}>📊 Your Quiz Results</h2>
         {loading ? (
           <p style={styles.info}>Loading...</p>
         ) : results.length === 0 ? (
