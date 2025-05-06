@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import pb from "../lib/pocketbase";
 
 export default function Home() {
+  const router = useRouter();
+  const [quizStartTime, setQuizStartTime] = useState(null);
+  const [resultId, setResultId] = useState(null);
   const [questionData, setQuestionData] = useState(null);
   const [selected, setSelected] = useState(null);
   const [showNext, setShowNext] = useState(false);
@@ -12,15 +17,42 @@ export default function Home() {
   const [quizFinished, setQuizFinished] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const [quizStarted, setQuizStarted] = useState(false);
+  const [showLoginAlert, setShowLoginAlert] = useState(false); // Nowy stan dla alertu
 
   const totalQuestions = 10;
 
   const ip1 = "http://192.168.0.71:5678/webhook/que";
   const ip2 = "http://172.16.15.148:5678/webhook/que";
 
+  // Funkcja do pobierania pytania
   const fetchQuestion = async () => {
+    if (questionNumber === 0) {
+      setQuizStartTime(Date.now());
+
+      const result = await pb.collection("results").create({
+        user: pb.authStore.model.id,
+        score: 0,
+        total: 0,
+        duration: 0,
+      });
+
+      setResultId(result.id);
+    }
+
     if (questionNumber >= totalQuestions) {
+      const endTime = Date.now();
+      const durationSeconds = Math.floor((endTime - quizStartTime) / 1000);
+
+      if (resultId) {
+        await pb.collection("results").update(resultId, {
+          score: correctAnswers,
+          total: totalQuestions,
+          duration: durationSeconds,
+        });
+      }
+
       setQuizFinished(true);
+
       return;
     }
 
@@ -74,6 +106,19 @@ export default function Home() {
 
   const questionProgress = (questionNumber / totalQuestions) * 100;
 
+  // Dodanie logiki do przekierowania, jeśli użytkownik nie jest zalogowany
+  const handleStartQuiz = () => {
+    if (!pb.authStore.isValid) {
+      setShowLoginAlert(true); // Pokazujemy alert przed przekierowaniem
+      setTimeout(() => {
+        router.push("/login"); // Po 2 sekundach przekierowanie
+      }, 2000);
+    } else {
+      setQuizStarted(true);
+      fetchQuestion(); // Jeśli użytkownik jest zalogowany, rozpocznij quiz
+    }
+  };
+
   return (
     <main style={styles.container}>
       <div style={styles.card}>
@@ -90,13 +135,7 @@ export default function Home() {
             </p>
           </>
         ) : !questionData ? (
-          <button
-            style={styles.button}
-            onClick={() => {
-              setQuizStarted(true);
-              fetchQuestion();
-            }}
-          >
+          <button style={styles.button} onClick={handleStartQuiz}>
             Start quiz
           </button>
         ) : (
@@ -159,6 +198,13 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Login alert message */}
+      {showLoginAlert && (
+        <div style={styles.alert}>
+          <p style={styles.alertText}>You need to log in to start the quiz!</p>
+        </div>
+      )}
 
       {/* Spinner animation */}
       <style jsx>{`
@@ -302,5 +348,22 @@ const styles = {
     fontWeight: "500",
     color: "#fff",
     zIndex: 2,
+  },
+  alert: {
+    backgroundColor: "#f8d7da",
+    color: "#721c24",
+    padding: "1rem",
+    borderRadius: "10px",
+    textAlign: "center",
+    position: "absolute",
+    top: "20px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "80%",
+    boxShadow: "0 5px 15px rgba(0, 0, 0, 0.1)",
+  },
+  alertText: {
+    fontSize: "1.2rem",
+    fontWeight: "600",
   },
 };
