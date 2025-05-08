@@ -11,26 +11,25 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+
     try {
-      await pb.collection("users").authWithPassword(email, password);
-    
+      const authData = await pb
+        .collection("users")
+        .authWithPassword(email, password);
+      const userId = authData.record.id;
 
-// dodaj TO:
-const userId = pb.authStore.model.id;
+      const newSession = await pb.collection("sessions").create({
+        user: userId,
+        quiz_count: 0,
+        quiz_history: [],
+        duration: 0,
+      });
 
-await pb.collection("sessions").create({
-  user: userId,
-  quiz_count: 0,
-  quiz_history: [],
-});
+      // Zapisz ID sesji i czas rozpoczęcia
+      localStorage.setItem("activeSessionId", newSession.id);
+      localStorage.setItem("sessionStart", new Date().toISOString());
 
       router.push("/dashboard");
-      const user = authData?.record;
-
-
-const newSession = await pb.collection("sessions").create({ user: user.id });
-localStorage.setItem("currentSessionId", newSession.id);
-
     } catch (err) {
       console.error(err);
       setError("Invalid email or password.");
@@ -121,7 +120,7 @@ const styles = {
     border: "2px solid #ccc",
     borderRadius: "10px",
     boxSizing: "border-box",
-    color:"gray"
+    color: "gray",
   },
   button: {
     padding: "1rem 2rem",

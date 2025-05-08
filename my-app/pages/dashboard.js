@@ -21,7 +21,6 @@ export default function ProtectedPage() {
       if (pb.authStore.isValid) {
         try {
           const userId = pb.authStore.model?.id;
-
           if (!userId) throw new Error("User ID not found.");
 
           const sessionData = await pb.collection("sessions").getFullList({
@@ -29,9 +28,27 @@ export default function ProtectedPage() {
             sort: "-created",
           });
 
-          setSessions(sessionData || []);
+          const sessionsWithQuizData = await Promise.all(
+            sessionData.map(async (session) => {
+              const quizDetails = await Promise.all(
+                (session.quiz_history || []).map(async (quizId) => {
+                  try {
+                    return await pb.collection("results").getOne(quizId);
+                  } catch {
+                    return null;
+                  }
+                })
+              );
+              return {
+                ...session,
+                quiz_history: quizDetails.filter(Boolean),
+              };
+            })
+          );
+
+          setSessions(sessionsWithQuizData);
         } catch (err) {
-          console.warn("Failed to fetch sessions:", err);
+          console.warn("Failed to fetch sessions or quiz data:", err);
           setSessions([]);
         }
       }
@@ -80,15 +97,39 @@ export default function ProtectedPage() {
       ) : (
         sessions.map((session) => (
           <div key={session.id} style={styles.card}>
-            <h2 style={styles.title}>📅 Session from {new Date(session.created).toLocaleString()}</h2>
-            <p style={styles.info}>Total quizzes: {session.quiz_count || 0}</p>
+            <h2 style={styles.title}>
+              📅 Session:{" "}
+              {new Date(session.created).toLocaleString([], {
+                dateStyle: "short",
+                timeStyle: "short",
+              })}{" "}
+              →{" "}
+              {session.end_time
+                ? new Date(session.end_time).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "in progress"}
+            </h2>
+
+            <p style={styles.info}>
+              ⏱️ Duration: {formatDuration(session.duration || 0)}
+            </p>
+            <p style={styles.info}>
+              📊 Total quizzes: {session.quiz_count || 0}
+            </p>
+
             <ul style={styles.list}>
               {session.quiz_history?.length > 0 ? (
                 session.quiz_history.map((q, idx) => (
                   <li key={idx} style={styles.item}>
-                    <strong>Score: {q.score}/{q.total}</strong><br />
-                    Time: {formatDuration(q.duration)}<br />
-                    Date: {new Date(q.time).toLocaleString()}
+                    <strong>
+                      Score: {q.score}/{q.total}
+                    </strong>
+                    <br />
+                    Time: {formatDuration(q.duration)}
+                    <br />
+                    Date: {formatQuizDate(q.created)}
                   </li>
                 ))
               ) : (
@@ -101,6 +142,14 @@ export default function ProtectedPage() {
     </main>
   );
 }
+
+const formatQuizDate = (date) => {
+  // Format dla quizu: 20:09 (tylko godzina i minuta)
+  return new Date(date).toLocaleString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 const formatDuration = (duration) => {
   const minutes = Math.floor(duration / 60);

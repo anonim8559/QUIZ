@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import pb from "../lib/pocketbase";
+import { logoutUser } from "../lib/logout";
 
 export default function Layout({ children }) {
   const [user, setUser] = useState(null);
@@ -11,11 +12,6 @@ export default function Layout({ children }) {
     setUser(pb.authStore.model);
     pb.authStore.onChange(() => setUser(pb.authStore.model));
   }, []);
-
-  const handleLogout = () => {
-    pb.authStore.clear();
-    router.push("/");
-  };
 
   return (
     <div style={styles.wrapper}>
@@ -32,7 +28,10 @@ export default function Layout({ children }) {
                 </span>{" "}
                 Dashboard
               </Link>
-              <button onClick={handleLogout} style={styles.logoutButton}>
+              <button
+                onClick={() => logoutUser(router)}
+                style={styles.logoutButton}
+              >
                 Logout
               </button>
             </>
