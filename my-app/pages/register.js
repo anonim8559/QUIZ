@@ -149,6 +149,7 @@ const styles = {
     border: "2px solid #ccc",
     borderRadius: "10px",
     boxSizing: "border-box",
+    color:"gray"
   },
   button: {
     padding: "1rem 2rem",

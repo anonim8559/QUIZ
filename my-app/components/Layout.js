@@ -26,7 +26,7 @@ export default function Layout({ children }) {
         <div style={styles.navItems}>
           {user ? (
             <>
-              <Link href="/protected" style={styles.dashboardLink}>
+              <Link href="/dashboard" style={styles.dashboardLink}>
                 <span role="img" aria-label="dashboard">
                   📊
                 </span>{" "}

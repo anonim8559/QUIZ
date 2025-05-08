@@ -22,8 +22,8 @@ export default function Home() {
 
   const totalQuestions = 10;
 
-  const ip1 = "http://192.168.0.71:5678/webhook/que";
-  const ip2 = "http://172.16.15.148:5678/webhook/que";
+  const ip1 = "http://172.16.15.148:5678/webhook/que";
+  const ip2 = "http://192.168.0.71:5678/webhook/que";
 
   // Funkcja do pobierania pytania
   const fetchQuestion = async () => {
@@ -45,13 +45,31 @@ export default function Home() {
       const durationSeconds = Math.floor((endTime - quizStartTime) / 1000);
 
       if (resultId) {
-        await pb.collection("results").update(resultId, {
+        const result = await pb.collection("results").create({
+          user: pb.authStore.model.id,
           score: correctAnswers,
           total: totalQuestions,
-          duration: durationSeconds,
+          duration: quizDuration, // zależnie od twojej logiki
         });
+        
+        // Pobierz aktywną sesję użytkownika (ostatnia sesja)
+        const sessions = await pb.collection("sessions").getFullList({
+          filter: `user="${pb.authStore.model.id}"`,
+          sort: "-created",
+          perPage: 1,
+        });
+        
+        if (sessions.length > 0) {
+          const latestSession = sessions[0];
+        
+          await pb.collection("sessions").update(latestSession.id, {
+            quiz_history: [...(latestSession.quiz_history || []), result.id],
+            quiz_count: (latestSession.quiz_count || 0) + 1,
+          });
+        }
+        
       }
-
+      
       setQuizFinished(true);
 
       return;
