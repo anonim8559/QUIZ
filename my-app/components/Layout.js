@@ -17,7 +17,7 @@ export default function Layout({ children }) {
     <div style={styles.wrapper}>
       <nav style={styles.navbar}>
         <div style={styles.logo} onClick={() => router.push("/")}>
-          🧠 EduQuiz
+          🧠 AIQuiz
         </div>
         <div style={styles.navItems}>
           {user ? (

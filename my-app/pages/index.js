@@ -22,8 +22,8 @@ export default function Home() {
 
   const totalQuestions = 10;
 
-  const ip2 = "http://172.16.15.148:5678/webhook/que";
-  const ip1 = "http://192.168.0.71:5678/webhook/que";
+  const ip1 = "http://172.16.15.148:5678/webhook/que";
+  const ip2 = "http://192.168.0.71:5678/webhook/que";
 
   // Funkcja do pobierania pytania
   const fetchQuestion = async () => {
@@ -90,14 +90,30 @@ export default function Home() {
     }
   };
 
-  const handleAnswerClick = (answer) => {
+  const handleAnswerClick = async (answer) => {
     if (selected !== null || loading || timeLeft === 0) return;
     setSelected(answer);
     setShowNext(true);
+  
     if (answer.is_Correct) {
       setCorrectAnswers((prev) => prev + 1);
     }
+  
+    const correctAnswer = Array.isArray(questionData.answers)
+      ? questionData.answers.find((a) => a?.is_Correct)?.text || null
+      : null;
+  
+    await pb.collection("user_answers").create({
+      result: resultId,
+      question_text: questionData.question || "",
+      user_answer: answer.text || null,
+      correct_answer: correctAnswer,
+      order: questionNumber,
+    });
   };
+  
+  
+  
 
   const getClass = (answer) => {
     if (!selected && timeLeft > 0) return "answer";
@@ -111,11 +127,27 @@ export default function Home() {
     if (!questionData || selected || loading || quizFinished) return;
     if (timeLeft <= 0) {
       setShowNext(true);
+    
+      const correctAnswer = Array.isArray(questionData.answers)
+        ? questionData.answers.find((a) => a?.is_Correct)?.text || null
+        : null;
+    
+      pb.collection("user_answers").create({
+        result: resultId,
+        question_text: questionData.question || "",
+        user_answer: null,
+        correct_answer: correctAnswer,
+        order: questionNumber,
+      });
+    
       return;
+        
     }
+  
     const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearTimeout(timer);
   }, [timeLeft, selected, questionData, loading, quizFinished]);
+  
 
   const timePercentage = (timeLeft / 30) * 100;
   const timeColor =

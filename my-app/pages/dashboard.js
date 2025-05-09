@@ -7,6 +7,8 @@ export default function ProtectedPage() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  const [liveNow, setLiveNow] = useState({});
+
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -46,7 +48,19 @@ export default function ProtectedPage() {
             })
           );
 
-          setSessions(sessionsWithQuizData);
+          setSessions(sessionsWithQuizData);// Jeżeli jest trwająca sesja, ustaw interwał liczenia duration
+          const active = sessionsWithQuizData.find((s) => !s.end_time);
+          if (active) {
+            const interval = setInterval(() => {
+              const start = new Date(active.created);
+              const now = new Date();
+              const duration = Math.floor((now - start) / 1000);
+              setLiveNow((prev) => ({ ...prev, [active.id]: duration }));
+            }, 1000);
+          
+            return () => clearInterval(interval);
+          }
+          
         } catch (err) {
           console.warn("Failed to fetch sessions or quiz data:", err);
           setSessions([]);
@@ -113,7 +127,10 @@ export default function ProtectedPage() {
             </h2>
 
             <p style={styles.info}>
-              ⏱️ Duration: {formatDuration(session.duration || 0)}
+              ⏱️ Duration: {formatDuration(
+  session.end_time ? session.duration : liveNow[session.id] || 0
+)}
+
             </p>
             <p style={styles.info}>
               📊 Total quizzes: {session.quiz_count || 0}
