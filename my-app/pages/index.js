@@ -25,129 +25,163 @@ export default function Home() {
   const ip1 = "http://172.16.15.148:5678/webhook/que";
   const ip2 = "http://192.168.0.71:5678/webhook/que";
 
-  // Funkcja do pobierania pytania
-  const fetchQuestion = async () => {
-    if (questionNumber === 0) {
-      setQuizStartTime(Date.now());
+  const getClass = (answer) => {
+  if (!selected && timeLeft > 0) return "answer";
+  if (answer === selected && answer.is_Correct) return "answer correct";
+  if (answer === selected && !answer.is_Correct) return "answer wrong";
+  if (answer.is_Correct) return "answer correct";
+  return "answer";
+};
 
-      const result = await pb.collection("results").create({
-        user: pb.authStore.model.id,
-        score: 0,
-        total: 0,
-        duration: 0,
+
+// Funkcja do pobierania pytania
+const fetchQuestion = async () => {
+  if (questionNumber === 0) {
+    setQuizStartTime(Date.now());
+
+    const result = await pb.collection("results").create({
+      user: pb.authStore.model.id,
+      score: 0,
+      total: 0,
+      duration: 0,
+    });
+
+    setResultId(result.id);
+  }
+
+  if (questionNumber >= totalQuestions) {
+    const endTime = Date.now();
+    const durationSeconds = Math.floor((endTime - quizStartTime) / 1000);
+
+    if (resultId) {
+      await pb.collection("results").update(resultId, {
+        score: correctAnswers,
+        total: totalQuestions,
+        duration: durationSeconds,
       });
 
-      setResultId(result.id);
-    }
+      const sessions = await pb.collection("sessions").getFullList({
+        filter: `user="${pb.authStore.model.id}"`,
+        sort: "-created",
+        perPage: 1,
+      });
 
-    if (questionNumber >= totalQuestions) {
-      const endTime = Date.now();
-      const durationSeconds = Math.floor((endTime - quizStartTime) / 1000);
+      if (sessions.length > 0) {
+        const latestSession = sessions[0];
 
-      if (resultId) {
-        const result = await pb.collection("results").create({
-          user: pb.authStore.model.id,
-          score: correctAnswers,
-          total: totalQuestions,
-          duration: durationSeconds,
+        await pb.collection("sessions").update(latestSession.id, {
+          quiz_history: [...(latestSession.quiz_history || []), resultId],
+          quiz_count: (latestSession.quiz_count || 0) + 1,
         });
-
-        const sessions = await pb.collection("sessions").getFullList({
-          filter: `user="${pb.authStore.model.id}"`,
-          sort: "-created",
-          perPage: 1,
-        });
-
-        if (sessions.length > 0) {
-          const latestSession = sessions[0];
-
-          await pb.collection("sessions").update(latestSession.id, {
-            quiz_history: [...(latestSession.quiz_history || []), result.id],
-            quiz_count: (latestSession.quiz_count || 0) + 1,
-          });
-        }
       }
-
-      setQuizFinished(true);
-
-      return;
     }
 
-    setLoading(true);
-    setSelected(null);
-    setShowNext(false);
-    setTimeLeft(30);
+    setQuizFinished(true);
+    return;
+  }
 
-    try {
-      const res = await fetch(ip1);
-      const data = await res.json();
-      setQuestionData(data);
-      setQuestionNumber((prev) => prev + 1);
-    } catch (error) {
-      console.error("Error fetching question:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  setSelected(null);
+  setShowNext(false);
+  setTimeLeft(30);
 
-  const handleAnswerClick = async (answer) => {
-    if (selected !== null || loading || timeLeft === 0) return;
-    setSelected(answer);
-    setShowNext(true);
-  
-    if (answer.is_Correct) {
-      setCorrectAnswers((prev) => prev + 1);
-    }
-  
-    const correctAnswer = Array.isArray(questionData.answers)
-      ? questionData.answers.find((a) => a?.is_Correct)?.text || null
+  try {
+    const res = await fetch(ip1); // lub ip2
+    const data = await res.json();
+    setQuestionData(data);
+    setQuestionNumber((prev) => prev + 1);
+  } catch (error) {
+    console.error("Error fetching question:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleAnswerClick = async (answer) => {
+  if (selected !== null || loading || timeLeft === 0) return;
+
+  setSelected(answer);
+  setShowNext(true);
+
+  if (answer.is_Correct) {
+    setCorrectAnswers((prev) => prev + 1);
+  }
+
+  const correctAnswer =
+    Array.isArray(questionData?.answers)
+      ? questionData.answers.find((a) => a?.is_Correct)?.content || null
       : null;
-  
+
+  const userAnswer = answer?.content || null;
+
+  console.log("ZAPISUJĘ:", {
+    result: resultId,
+    question_text: questionData?.question,
+    options: questionData?.answers,
+    correct_answer: correctAnswer,
+    user_answer: userAnswer,
+    order: questionNumber,
+  });
+
+  try {
     await pb.collection("user_answers").create({
       result: resultId,
-      question_text: questionData.question || "",
-      user_answer: answer.text || null,
+      question_text: questionData?.question || "",
+      options: JSON.stringify(questionData?.answers || []),
       correct_answer: correctAnswer,
+      user_answer: userAnswer,
       order: questionNumber,
     });
-  };
-  
-  
-  
+  } catch (err) {
+    console.error("Błąd zapisu user_answer:", err);
+  }
+};
 
-  const getClass = (answer) => {
-    if (!selected && timeLeft > 0) return "answer";
-    if (answer === selected && answer.is_Correct) return "answer correct";
-    if (answer === selected && !answer.is_Correct) return "answer wrong";
-    if (answer.is_Correct) return "answer correct";
-    return "answer";
-  };
 
-  useEffect(() => {
-    if (!questionData || selected || loading || quizFinished) return;
-    if (timeLeft <= 0) {
-      setShowNext(true);
-    
-      const correctAnswer = Array.isArray(questionData.answers)
-        ? questionData.answers.find((a) => a?.is_Correct)?.text || null
+useEffect(() => {
+  if (!questionData || selected || loading || quizFinished) return;
+
+  if (timeLeft <= 0) {
+    setShowNext(true);
+
+    const correctAnswer =
+      Array.isArray(questionData?.answers)
+        ? questionData.answers.find((a) => a?.is_Correct)?.content || null
         : null;
-    
+
+    console.log("ZAPISUJĘ przy timeout:", {
+      result: resultId,
+      question_text: questionData?.question,
+      options: questionData?.answers,
+      correct_answer: correctAnswer,
+      user_answer: null,
+      order: questionNumber,
+    });
+
+    try {
       pb.collection("user_answers").create({
         result: resultId,
-        question_text: questionData.question || "",
-        user_answer: null,
+        question_text: questionData?.question || "",
+        options: JSON.stringify(questionData?.answers || []),
         correct_answer: correctAnswer,
+        user_answer: null,
         order: questionNumber,
       });
-    
-      return;
-        
+    } catch (err) {
+      console.error("Błąd zapisu user_answer przy timeout:", err);
     }
-  
-    const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [timeLeft, selected, questionData, loading, quizFinished]);
-  
+
+    return;
+  }
+
+  const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000);
+  return () => clearTimeout(timer);
+}, [timeLeft, selected, questionData, loading, quizFinished]);
+
+
+
+
+
 
   const timePercentage = (timeLeft / 30) * 100;
   const timeColor =

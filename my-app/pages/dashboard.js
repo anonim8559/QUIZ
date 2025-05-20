@@ -8,7 +8,8 @@ export default function ProtectedPage() {
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [liveNow, setLiveNow] = useState({});
-
+  const [expandedQuizId, setExpandedQuizId] = useState(null);
+  const [quizDetails, setQuizDetails] = useState({});
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -48,7 +49,8 @@ export default function ProtectedPage() {
             })
           );
 
-          setSessions(sessionsWithQuizData);// Jeżeli jest trwająca sesja, ustaw interwał liczenia duration
+          setSessions(sessionsWithQuizData);
+
           const active = sessionsWithQuizData.find((s) => !s.end_time);
           if (active) {
             const interval = setInterval(() => {
@@ -57,10 +59,8 @@ export default function ProtectedPage() {
               const duration = Math.floor((now - start) / 1000);
               setLiveNow((prev) => ({ ...prev, [active.id]: duration }));
             }, 1000);
-          
             return () => clearInterval(interval);
           }
-          
         } catch (err) {
           console.warn("Failed to fetch sessions or quiz data:", err);
           setSessions([]);
@@ -73,45 +73,45 @@ export default function ProtectedPage() {
     checkAuthAndFetch();
   }, []);
 
+  const handleToggleQuiz = async (quizId) => {
+    if (expandedQuizId === quizId) {
+      setExpandedQuizId(null);
+      return;
+    }
+
+    setExpandedQuizId(quizId);
+
+    if (!quizDetails[quizId]) {
+      try {
+        const answers = await pb.collection("user_answers").getFullList({
+          filter: `result="${quizId}"`,
+          sort: "+order",
+        });
+        setQuizDetails((prev) => ({ ...prev, [quizId]: answers }));
+      } catch (err) {
+        console.error("Błąd pobierania szczegółów quizu:", err);
+      }
+    }
+  };
+
   if (!authChecked) {
-    return (
-      <main style={styles.container}>
-        <div style={styles.card}>
-          <p style={styles.info}>Checking authentication...</p>
-        </div>
-      </main>
-    );
+    return <p>Checking authentication...</p>;
   }
 
   if (!pb.authStore.isValid) {
-    return (
-      <main style={styles.container}>
-        <div style={styles.card}>
-          <h2 style={{ ...styles.title, color: "black", fontWeight: "600" }}>
-            🔒 Please log in to view your dashboard
-          </h2>
-          <p style={{ ...styles.info, color: "gray", fontWeight: "500" }}>
-            Redirecting to login page...
-          </p>
-        </div>
-      </main>
-    );
+    return <p>🔒 Please log in to view your dashboard</p>;
   }
 
   return (
     <main style={styles.container}>
       {loading ? (
-        <div style={styles.card}>
-          <p style={styles.info}>Loading sessions...</p>
-        </div>
+        <p>Loading sessions...</p>
       ) : sessions.length === 0 ? (
-        <div style={styles.card}>
-          <p style={styles.info}>You have no sessions yet.</p>
-        </div>
+        <p>You have no sessions yet.</p>
       ) : (
         sessions.map((session) => (
           <div key={session.id} style={styles.card}>
-            <h2 style={styles.title}>
+                  <h2 style={styles.title}>
               📅 Session:{" "}
               {new Date(session.created).toLocaleString([], {
                 dateStyle: "short",
@@ -125,21 +125,20 @@ export default function ProtectedPage() {
                   })
                 : "in progress"}
             </h2>
-
             <p style={styles.info}>
-              ⏱️ Duration: {formatDuration(
-  session.end_time ? session.duration : liveNow[session.id] || 0
-)}
-
+              ⏱️ Duration:{" "}
+              {formatDuration(
+                session.end_time ? session.duration : liveNow[session.id] || 0
+              )}
             </p>
             <p style={styles.info}>
               📊 Total quizzes: {session.quiz_count || 0}
             </p>
 
             <ul style={styles.list}>
-              {session.quiz_history?.length > 0 ? (
-                session.quiz_history.map((q, idx) => (
-                  <li key={idx} style={styles.item}>
+              {session.quiz_history?.map((q, idx) => (
+                <li key={idx} style={styles.item}>
+                  <div onClick={() => handleToggleQuiz(q.id)} style={{ cursor: "pointer" }}>
                     <strong>
                       Score: {q.score}/{q.total}
                     </strong>
@@ -147,11 +146,25 @@ export default function ProtectedPage() {
                     Time: {formatDuration(q.duration)}
                     <br />
                     Date: {formatQuizDate(q.created)}
-                  </li>
-                ))
-              ) : (
-                <p style={styles.info}>No quizzes in this session.</p>
-              )}
+                  </div>
+
+                  {expandedQuizId === q.id && quizDetails[q.id] && (
+                    <ul style={{ marginTop: "1rem", textAlign: "left" }}>
+                      {quizDetails[q.id].map((ans, i) => (
+                        <li key={i} style={{ marginBottom: "1rem" }}>
+                          <strong>Pytanie:</strong> {ans.question_text}
+                          <br />
+                          <strong>Twoja odpowiedź:</strong>{" "}
+                          {ans.user_answer || "❌ Brak odpowiedzi"}
+                          <br />
+                          <strong>Poprawna odpowiedź:</strong>{" "}
+                          {ans.correct_answer || "Nieznana"}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
         ))
@@ -160,13 +173,11 @@ export default function ProtectedPage() {
   );
 }
 
-const formatQuizDate = (date) => {
-  // Format dla quizu: 20:09 (tylko godzina i minuta)
-  return new Date(date).toLocaleString("pl-PL", {
+const formatQuizDate = (date) =>
+  new Date(date).toLocaleString("pl-PL", {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
 
 const formatDuration = (duration) => {
   const minutes = Math.floor(duration / 60);
