@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import pb from "../lib/pocketbase";
-import { color } from "framer-motion";
 
 export default function Home() {
   const router = useRouter();
@@ -18,42 +17,50 @@ export default function Home() {
   const [quizFinished, setQuizFinished] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const [quizStarted, setQuizStarted] = useState(false);
-  const [showLoginAlert, setShowLoginAlert] = useState(false); // Nowy stan dla alertu
+  const [showLoginAlert, setShowLoginAlert] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
 
   const totalQuestions = 10;
-
-  const ip1 = "http://172.16.15.148:5678/webhook/que";
-  const ip2 = "http://192.168.0.71:5678/webhook/que";
+  const baseURL = "http://192.168.0.71:5678/webhook";
 
   const getClass = (answer) => {
-  if (!selected && timeLeft > 0) return "answer";
-  if (answer === selected && answer.is_Correct) return "answer correct";
-  if (answer === selected && !answer.is_Correct) return "answer wrong";
-  if (answer.is_Correct) return "answer correct";
-  return "answer";
-};
+    if (!selected && timeLeft > 0) return "answer";
+    if (answer === selected && answer.is_Correct) return "answer correct";
+    if (answer === selected && !answer.is_Correct) return "answer wrong";
+    if (answer.is_Correct) return "answer correct";
+    return "answer";
+  };
 
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${baseURL}/category`);
+      const data = await res.json();
+      setCategories(data.name || []);
+    } catch (err) {
+      console.error("Błąd podczas pobierania kategorii:", err);
+    }
+  };
 
-// Funkcja do pobierania pytania
-const fetchQuestion = async () => {
-  if (questionNumber === 0) {
-    setQuizStartTime(Date.now());
+  const fetchQuestion = async () => {
+    if (questionNumber === 0) {
+      setQuizStartTime(Date.now());
 
-    const result = await pb.collection("results").create({
-      user: pb.authStore.model.id,
-      score: 0,
-      total: 0,
-      duration: 0,
-    });
+      const result = await pb.collection("results").create({
+        user: pb.authStore.model.id,
+        score: 0,
+        total: 0,
+        duration: 0,
+        category: selectedCategory,
+      });
 
-    setResultId(result.id);
-  }
+      setResultId(result.id);
+    }
 
-  if (questionNumber >= totalQuestions) {
-    const endTime = Date.now();
-    const durationSeconds = Math.floor((endTime - quizStartTime) / 1000);
+    if (questionNumber >= totalQuestions) {
+      const endTime = Date.now();
+      const durationSeconds = Math.floor((endTime - quizStartTime) / 1000);
 
-    if (resultId) {
       await pb.collection("results").update(resultId, {
         score: correctAnswers,
         total: totalQuestions,
@@ -68,97 +75,69 @@ const fetchQuestion = async () => {
 
       if (sessions.length > 0) {
         const latestSession = sessions[0];
-
         await pb.collection("sessions").update(latestSession.id, {
           quiz_history: [...(latestSession.quiz_history || []), resultId],
           quiz_count: (latestSession.quiz_count || 0) + 1,
         });
       }
+
+      setQuizFinished(true);
+      return;
     }
 
-    setQuizFinished(true);
-    return;
-  }
+    setLoading(true);
+    setSelected(null);
+    setShowNext(false);
+    setTimeLeft(30);
 
-  setLoading(true);
-  setSelected(null);
-  setShowNext(false);
-  setTimeLeft(30);
+    try {
+      const res = await fetch(`${baseURL}/que?category=${selectedCategory}`);
+      const data = await res.json();
+      setQuestionData(data);
+      setQuestionNumber((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error fetching question:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  try {
-    const res = await fetch(ip1); // lub ip2
-    const data = await res.json();
-    setQuestionData(data);
-    setQuestionNumber((prev) => prev + 1);
-  } catch (error) {
-    console.error("Error fetching question:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+  const handleAnswerClick = async (answer) => {
+    if (selected !== null || loading || timeLeft === 0) return;
 
-const handleAnswerClick = async (answer) => {
-  if (selected !== null || loading || timeLeft === 0) return;
+    setSelected(answer);
+    setShowNext(true);
 
-  setSelected(answer);
-  setShowNext(true);
+    if (answer.is_Correct) {
+      setCorrectAnswers((prev) => prev + 1);
+    }
 
-  if (answer.is_Correct) {
-    setCorrectAnswers((prev) => prev + 1);
-  }
+    const correctAnswer =
+      questionData?.answers.find((a) => a?.is_Correct)?.content || null;
 
-  const correctAnswer =
-    Array.isArray(questionData?.answers)
-      ? questionData.answers.find((a) => a?.is_Correct)?.content || null
-      : null;
-
-  const userAnswer = answer?.content || null;
-
-  console.log("ZAPISUJĘ:", {
-    result: resultId,
-    question_text: questionData?.question,
-    options: questionData?.answers,
-    correct_answer: correctAnswer,
-    user_answer: userAnswer,
-    order: questionNumber,
-  });
-
-  try {
     await pb.collection("user_answers").create({
       result: resultId,
       question_text: questionData?.question || "",
       options: JSON.stringify(questionData?.answers || []),
       correct_answer: correctAnswer,
-      user_answer: userAnswer,
+      user_answer: answer?.content || null,
       order: questionNumber,
+      category: selectedCategory,
     });
-  } catch (err) {
-    console.error("Błąd zapisu user_answer:", err);
-  }
-};
+  };
 
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
-useEffect(() => {
-  if (!questionData || selected || loading || quizFinished) return;
+  useEffect(() => {
+    if (!questionData || selected || loading || quizFinished) return;
 
-  if (timeLeft <= 0) {
-    setShowNext(true);
+    if (timeLeft <= 0) {
+      setShowNext(true);
+      const correctAnswer =
+        questionData?.answers.find((a) => a?.is_Correct)?.content || null;
 
-    const correctAnswer =
-      Array.isArray(questionData?.answers)
-        ? questionData.answers.find((a) => a?.is_Correct)?.content || null
-        : null;
-
-    console.log("ZAPISUJĘ przy timeout:", {
-      result: resultId,
-      question_text: questionData?.question,
-      options: questionData?.answers,
-      correct_answer: correctAnswer,
-      user_answer: null,
-      order: questionNumber,
-    });
-
-    try {
       pb.collection("user_answers").create({
         result: resultId,
         question_text: questionData?.question || "",
@@ -166,40 +145,36 @@ useEffect(() => {
         correct_answer: correctAnswer,
         user_answer: null,
         order: questionNumber,
+        category: selectedCategory,
       });
-    } catch (err) {
-      console.error("Błąd zapisu user_answer przy timeout:", err);
+
+      return;
     }
 
-    return;
-  }
+    const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft, selected, questionData, loading, quizFinished]);
 
-  const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000);
-  return () => clearTimeout(timer);
-}, [timeLeft, selected, questionData, loading, quizFinished]);
-
-
-
-
-
+  const handleStartQuiz = () => {
+    if (!pb.authStore.isValid) {
+      setShowLoginAlert(true);
+      setTimeout(() => {
+        router.push("/login");
+      }, 2000);
+    } else {
+      if (!selectedCategory) {
+        alert("Wybierz kategorię!");
+        return;
+      }
+      setQuizStarted(true);
+      fetchQuestion();
+    }
+  };
 
   const timePercentage = (timeLeft / 30) * 100;
   const timeColor =
     timeLeft <= 10 ? "#dc3545" : timeLeft <= 20 ? "#ffc107" : "#28a745";
-
   const questionProgress = (questionNumber / totalQuestions) * 100;
-
-  const handleStartQuiz = () => {
-    if (!pb.authStore.isValid) {
-      setShowLoginAlert(true); // pokazuje komunikat
-      setTimeout(() => {
-        router.push("/login"); // przekierowanie po 2s
-      }, 2000);
-    } else {
-      setQuizStarted(true);
-      fetchQuestion(); // rozpoczęcie quizu
-    }
-  };
 
   return (
     <main style={styles.container}>
@@ -229,6 +204,31 @@ useEffect(() => {
           </div>
         )}
 
+        {!quizStarted && !quizFinished && (
+          <>
+            <h2 style={styles.title}>Wybierz kategorię:</h2>
+            <select
+              style={{
+                marginBottom: "1rem",
+                padding: "0.5rem",
+                fontSize: "1rem",
+              }}
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <option value="">-- wybierz kategorię --</option>
+              {categories.map((cat, idx) => (
+                <option key={idx} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <button style={styles.button} onClick={handleStartQuiz}>
+              Start quiz
+            </button>
+          </>
+        )}
+
         {loading ? (
           <div style={styles.loaderContainer}>
             <div className="spinner" />
@@ -241,14 +241,9 @@ useEffect(() => {
               Correct answers: {correctAnswers} / {totalQuestions}
             </p>
           </>
-        ) : !questionData ? (
-          <button style={styles.button} onClick={handleStartQuiz}>
-            Start quiz
-          </button>
         ) : (
-          <>
-            {/* Time progress bar */}
-            {quizStarted && (
+          questionData && (
+            <>
               <div style={styles.progressWrapper}>
                 <div
                   style={{
@@ -261,35 +256,36 @@ useEffect(() => {
                   {timeLeft > 0 ? `${timeLeft} seconds` : "⏰ Time's up!"}
                 </span>
               </div>
-            )}
 
-            <h2 style={styles.question}>{questionData.question}</h2>
-            <div style={styles.answersWrapper}>
-              {questionData.answers.map((answer, idx) => (
-                <div
-                  key={idx}
-                  className={getClass(answer)}
-                  onClick={() => handleAnswerClick(answer)}
-                  style={{
-                    ...styles.answer,
-                    ...(getClass(answer).includes("correct") && styles.correct),
-                    ...(getClass(answer).includes("wrong") && styles.wrong),
-                    pointerEvents: selected || timeLeft <= 0 ? "none" : "auto",
-                  }}
-                >
-                  {answer.content}
-                </div>
-              ))}
-            </div>
-            {showNext && (
-              <button style={styles.button} onClick={fetchQuestion}>
-                Next
-              </button>
-            )}
-          </>
+              <h2 style={styles.question}>{questionData.question}</h2>
+              <div style={styles.answersWrapper}>
+                {questionData.answers.map((answer, idx) => (
+                  <div
+                    key={idx}
+                    className={getClass(answer)}
+                    onClick={() => handleAnswerClick(answer)}
+                    style={{
+                      ...styles.answer,
+                      ...(getClass(answer).includes("correct") &&
+                        styles.correct),
+                      ...(getClass(answer).includes("wrong") && styles.wrong),
+                      pointerEvents:
+                        selected || timeLeft <= 0 ? "none" : "auto",
+                    }}
+                  >
+                    {answer.content}
+                  </div>
+                ))}
+              </div>
+              {showNext && (
+                <button style={styles.button} onClick={fetchQuestion}>
+                  Next
+                </button>
+              )}
+            </>
+          )
         )}
 
-        {/* Question counter progress bar (bottom) - only after question is generated */}
         {quizStarted && !loading && !quizFinished && (
           <div style={styles.questionCounterWrapper}>
             <div
@@ -306,7 +302,6 @@ useEffect(() => {
         )}
       </div>
 
-      {/* Spinner animation */}
       <style jsx>{`
         .spinner {
           width: 50px;
@@ -327,7 +322,6 @@ useEffect(() => {
     </main>
   );
 }
-
 const styles = {
   container: {
     minHeight: "100vh",

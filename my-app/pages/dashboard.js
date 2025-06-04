@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import pb from "../lib/pocketbase";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function ProtectedPage() {
   const router = useRouter();
@@ -8,6 +20,7 @@ export default function ProtectedPage() {
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [liveNow, setLiveNow] = useState({});
+  const [allResults, setAllResults] = useState([]);
   const [expandedQuizId, setExpandedQuizId] = useState(null);
   const [quizDetails, setQuizDetails] = useState({});
 
@@ -50,6 +63,11 @@ export default function ProtectedPage() {
           );
 
           setSessions(sessionsWithQuizData);
+
+          const allQuizResults = sessionsWithQuizData.flatMap(
+            (s) => s.quiz_history
+          );
+          setAllResults(allQuizResults);
 
           const active = sessionsWithQuizData.find((s) => !s.end_time);
           if (active) {
@@ -94,6 +112,37 @@ export default function ProtectedPage() {
     }
   };
 
+  const COLORS = ["#00C49F", "#FF8042"];
+  const chartData = allResults.map((r, idx) => ({
+    name: `Quiz ${idx + 1}`,
+    correct: r.score,
+    incorrect: r.total - r.score,
+  }));
+  const totalCorrect = allResults.reduce((sum, r) => sum + r.score, 0);
+  const totalTotal = allResults.reduce((sum, r) => sum + r.total, 0);
+  const totalIncorrect = totalTotal - totalCorrect;
+  const passRate =
+    totalTotal > 0 ? Math.round((totalCorrect / totalTotal) * 100) : 0;
+  const passedCount = allResults.filter((r) => r.score / r.total >= 0.5).length;
+  const failedCount = allResults.length - passedCount;
+  const categoryStats = allResults.reduce((acc, r) => {
+    const cat = r.category || "Brak kategorii";
+    if (!acc[cat]) {
+      acc[cat] = { correct: 0, total: 0 };
+    }
+    acc[cat].correct += r.score;
+    acc[cat].total += r.total;
+    return acc;
+  }, {});
+
+  const categoryChartData = Object.entries(categoryStats).map(
+    ([category, { correct, total }]) => ({
+      category,
+      correct,
+      incorrect: total - correct,
+    })
+  );
+
   if (!authChecked) {
     return <p>Checking authentication...</p>;
   }
@@ -104,6 +153,111 @@ export default function ProtectedPage() {
 
   return (
     <main style={styles.container}>
+      <h1 style={styles.header}>📈 Your Quiz Stats</h1>
+
+      {allResults.length > 0 ? (
+        <div style={styles.chartsContainer}>
+          <div style={styles.chartBox}>
+            <h2 style={{ color: "#333" }}>Overall Performance</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: "Correct", value: totalCorrect },
+                    { name: "Incorrect", value: totalIncorrect },
+                  ]}
+                  dataKey="value"
+                  outerRadius={100}
+                  label={{ fill: "#333", fontWeight: "bold" }}
+                >
+                  {COLORS.map((color, index) => (
+                    <Cell key={index} fill={color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <p style={{ marginTop: "1rem", color: "#333", fontWeight: "bold" }}>
+              Accuracy: {passRate}%
+            </p>
+          </div>
+
+          <div style={styles.chartBox}>
+            <h2 style={{ color: "#333" }}>Quizzes Passed (≥ 50%)</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: "Passed", value: passedCount },
+                    { name: "Failed", value: failedCount },
+                  ]}
+                  dataKey="value"
+                  outerRadius={100}
+                  label={{ fill: "#333", fontWeight: "bold" }}
+                >
+                  <Cell fill="#00C49F" />
+                  <Cell fill="#FF8042" />
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <p style={{ marginTop: "1rem", color: "#333", fontWeight: "bold" }}>
+              Passed: {passedCount}/{allResults.length} (
+              {Math.round((passedCount / allResults.length) * 100)}%)
+            </p>
+          </div>
+
+          <div style={styles.chartBox}>
+            <h2 style={{ color: "#333" }}>All Quiz Results</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" stroke="#333" />
+                <YAxis stroke="#333" />
+                <Tooltip />
+                <Legend />
+                <Bar
+                  dataKey="correct"
+                  stackId="a"
+                  fill="#00C49F"
+                  name="Correct"
+                />
+                <Bar
+                  dataKey="incorrect"
+                  stackId="a"
+                  fill="#FF8042"
+                  name="Incorrect"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={styles.chartBox}>
+            <h2 style={{ color: "#333" }}>Performance by Category</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={categoryChartData}>
+                <XAxis dataKey="category" stroke="#333" />
+                <YAxis stroke="#333" />
+                <Tooltip />
+                <Legend />
+                <Bar
+                  dataKey="correct"
+                  stackId="a"
+                  fill="#00C49F"
+                  name="Correct"
+                />
+                <Bar
+                  dataKey="incorrect"
+                  stackId="a"
+                  fill="#FF8042"
+                  name="Incorrect"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      ) : (
+        <p style={{ color: "#333" }}>No quiz data to display.</p>
+      )}
+
       {loading ? (
         <p>Loading sessions...</p>
       ) : sessions.length === 0 ? (
@@ -111,7 +265,7 @@ export default function ProtectedPage() {
       ) : (
         sessions.map((session) => (
           <div key={session.id} style={styles.card}>
-                  <h2 style={styles.title}>
+            <h2 style={styles.title}>
               📅 Session:{" "}
               {new Date(session.created).toLocaleString([], {
                 dateStyle: "short",
@@ -138,10 +292,15 @@ export default function ProtectedPage() {
             <ul style={styles.list}>
               {session.quiz_history?.map((q, idx) => (
                 <li key={idx} style={styles.item}>
-                  <div onClick={() => handleToggleQuiz(q.id)} style={{ cursor: "pointer" }}>
+                  <div
+                    onClick={() => handleToggleQuiz(q.id)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <strong>
                       Score: {q.score}/{q.total}
                     </strong>
+                    <br />
+                    Category: {q.category || "Brak kategorii"}
                     <br />
                     Time: {formatDuration(q.duration)}
                     <br />
@@ -152,13 +311,13 @@ export default function ProtectedPage() {
                     <ul style={{ marginTop: "1rem", textAlign: "left" }}>
                       {quizDetails[q.id].map((ans, i) => (
                         <li key={i} style={{ marginBottom: "1rem" }}>
-                          <strong>Pytanie:</strong> {ans.question_text}
+                          <strong>Question:</strong> {ans.question_text}
                           <br />
-                          <strong>Twoja odpowiedź:</strong>{" "}
-                          {ans.user_answer || "❌ Brak odpowiedzi"}
+                          <strong>Your answer:</strong>{" "}
+                          {ans.user_answer || "❌ No answer"}
                           <br />
-                          <strong>Poprawna odpowiedź:</strong>{" "}
-                          {ans.correct_answer || "Nieznana"}
+                          <strong>Correct answer:</strong>{" "}
+                          {ans.correct_answer || "Na"}
                         </li>
                       ))}
                     </ul>
@@ -195,6 +354,26 @@ const styles = {
     padding: "2rem",
     fontFamily: "'Roboto', sans-serif",
     gap: "2rem",
+  },
+  header: {
+    fontSize: "2rem",
+    fontWeight: "700",
+    color: "#333",
+  },
+  chartsContainer: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "2rem",
+    width: "100%",
+    maxWidth: "1200px",
+  },
+  chartBox: {
+    backgroundColor: "#fff",
+    borderRadius: "16px",
+    padding: "1.5rem",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+    flex: "1 1 400px",
   },
   card: {
     background: "linear-gradient(135deg, #ffffff, #e6e6f1)",
