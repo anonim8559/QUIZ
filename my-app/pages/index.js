@@ -3,6 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import pb from "../lib/pocketbase";
+import { RippleButton } from "@/components/magicui/ripple-button";
+import { GlowingEffect } from "@/components/ui/glowing-effect";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PulsatingButton } from "@/components/magicui/pulsating-button";
 
 export default function Home() {
   const router = useRouter();
@@ -43,6 +53,8 @@ export default function Home() {
   };
 
   const fetchQuestion = async () => {
+    const encodedCategory = encodeURIComponent(selectedCategory);
+
     if (questionNumber === 0) {
       setQuizStartTime(Date.now());
 
@@ -51,7 +63,7 @@ export default function Home() {
         score: 0,
         total: 0,
         duration: 0,
-        category: selectedCategory,
+        category: selectedCategory, // ← zapisujesz normalnie, bez encode
       });
 
       setResultId(result.id);
@@ -91,7 +103,7 @@ export default function Home() {
     setTimeLeft(30);
 
     try {
-      const res = await fetch(`${baseURL}/que?category=${selectedCategory}`);
+      const res = await fetch(`${baseURL}/que?category=${encodedCategory}`);
       const data = await res.json();
       setQuestionData(data);
       setQuestionNumber((prev) => prev + 1);
@@ -204,30 +216,54 @@ export default function Home() {
           </div>
         )}
 
-        {!quizStarted && !quizFinished && (
-          <>
-            <h2 style={styles.title}>Wybierz kategorię:</h2>
-            <select
-              style={{
-                marginBottom: "1rem",
-                padding: "0.5rem",
-                fontSize: "1rem",
-              }}
+        <h2 style={styles.title}>Wybierz kategorię:</h2>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "1rem",
+            marginBottom: "2rem",
+          }}
+        >
+          <div className="relative w-[220px]">
+            <GlowingEffect
+              spread={60}
+              glow={true}
+              disabled={false}
+              proximity={64}
+              inactiveZone={0.01}
+            />
+            <Select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onValueChange={(value) => setSelectedCategory(value)}
             >
-              <option value="">-- wybierz kategorię --</option>
-              {categories.map((cat, idx) => (
-                <option key={idx} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-            <button style={styles.button} onClick={handleStartQuiz}>
-              Start quiz
-            </button>
-          </>
-        )}
+              <SelectTrigger className="w-full z-10 bg-white dark:bg-slate-900">
+                <SelectValue placeholder="-- wybierz kategorię --" />
+              </SelectTrigger>
+              <SelectContent className="z-20">
+                {categories.map((cat, idx) => (
+                  <SelectItem key={idx} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <PulsatingButton
+            style={{
+              ...styles.button,
+              padding: "0.75rem 1.5rem",
+              fontSize: "1.1rem",
+            }}
+            onClick={handleStartQuiz}
+          >
+            Start quiz
+          </PulsatingButton>
+        </div>
 
         {loading ? (
           <div style={styles.loaderContainer}>
@@ -459,5 +495,37 @@ const styles = {
   alertText: {
     fontSize: "1.2rem",
     fontWeight: "600",
+  },
+
+  title: {
+    fontSize: "1.5rem",
+    fontWeight: "bold",
+    marginBottom: "1rem",
+    color: "#333",
+  },
+  categoryContainer: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "0.5rem",
+    marginBottom: "1rem",
+    justifyContent: "center",
+  },
+  categoryButton: {
+    padding: "0.5rem 1rem",
+    borderRadius: "6px",
+    border: "1px solid #ccc",
+    cursor: "pointer",
+    fontSize: "1rem",
+    transition: "all 0.2s ease-in-out",
+  },
+  button: {
+    padding: "0.6rem 1.2rem",
+    fontSize: "1rem",
+    backgroundColor: "#0070f3",
+    color: "#fff",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    marginTop: "1rem",
   },
 };
