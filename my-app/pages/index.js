@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PulsatingButton } from "@/components/magicui/pulsating-button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 
 export default function Home() {
   const router = useRouter();
@@ -63,7 +64,7 @@ export default function Home() {
         score: 0,
         total: 0,
         duration: 0,
-        category: selectedCategory, // ← zapisujesz normalnie, bez encode
+        category: selectedCategory,
       });
 
       setResultId(result.id);
@@ -229,6 +230,7 @@ export default function Home() {
           }}
         >
           <div className="relative w-[220px]">
+            {/* aceternity */}
             <GlowingEffect
               spread={60}
               glow={true}
@@ -236,6 +238,7 @@ export default function Home() {
               proximity={64}
               inactiveZone={0.01}
             />
+            {/* shadcn */}
             <Select
               value={selectedCategory}
               onValueChange={(value) => setSelectedCategory(value)}
@@ -253,7 +256,8 @@ export default function Home() {
             </Select>
           </div>
 
-          <PulsatingButton
+          {/* magicui */}
+          <ShimmerButton
             style={{
               ...styles.button,
               padding: "0.75rem 1.5rem",
@@ -262,7 +266,7 @@ export default function Home() {
             onClick={handleStartQuiz}
           >
             Start quiz
-          </PulsatingButton>
+          </ShimmerButton>
         </div>
 
         {loading ? (

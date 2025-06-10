@@ -25,7 +25,6 @@ export default function Login() {
         duration: 0,
       });
 
-      // Zapisz ID sesji i czas rozpoczęcia
       localStorage.setItem("activeSessionId", newSession.id);
       localStorage.setItem("sessionStart", new Date().toISOString());
 
